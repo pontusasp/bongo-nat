@@ -74,7 +74,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(30, 30, 30, 0.85);
+    background: rgba(0, 0, 0, 0);
     border-radius: 20px;
     cursor: grab;
   }

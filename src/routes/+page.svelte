@@ -13,7 +13,8 @@
   const BONK_DURATION_MS = 150;
   const BONK_COUNT_KEY = "bongo-nat-bonk-count";
 
-  function handleKeydown(_e: KeyboardEvent) {
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.repeat) return;
     console.log("[bongo-nat] Browser keydown detected");
     onBonk();
   }

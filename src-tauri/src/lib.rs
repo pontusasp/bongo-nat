@@ -1,3 +1,6 @@
+use std::collections::HashSet;
+use std::sync::Mutex;
+
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::Emitter;
@@ -28,15 +31,30 @@ pub fn run() {
             let app_handle = app.handle().clone();
             std::thread::spawn(move || {
                 println!("[bongo-nat] Listener thread spawned");
+                let held_keys: Mutex<HashSet<rdev::Key>> = Mutex::new(HashSet::new());
+                let held_buttons: Mutex<HashSet<rdev::Button>> = Mutex::new(HashSet::new());
                 if let Err(e) = rdev::listen(move |event| {
                     match event.event_type {
                         rdev::EventType::KeyPress(key) => {
-                            println!("[bongo-nat] Key pressed: {:?}", key);
-                            let _ = app_handle.emit("keypress", ());
+                            let mut keys = held_keys.lock().unwrap();
+                            if keys.insert(key) {
+                                // First press – not a repeat
+                                println!("[bongo-nat] Key pressed: {:?}", key);
+                                let _ = app_handle.emit("keypress", ());
+                            }
+                        }
+                        rdev::EventType::KeyRelease(key) => {
+                            held_keys.lock().unwrap().remove(&key);
                         }
                         rdev::EventType::ButtonPress(button) => {
-                            println!("[bongo-nat] Mouse button pressed: {:?}", button);
-                            let _ = app_handle.emit("keypress", ());
+                            let mut buttons = held_buttons.lock().unwrap();
+                            if buttons.insert(button) {
+                                println!("[bongo-nat] Mouse button pressed: {:?}", button);
+                                let _ = app_handle.emit("keypress", ());
+                            }
+                        }
+                        rdev::EventType::ButtonRelease(button) => {
+                            held_buttons.lock().unwrap().remove(&button);
                         }
                         _ => {}
                     }

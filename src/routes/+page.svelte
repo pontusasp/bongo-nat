@@ -18,6 +18,15 @@
     onBonk();
   }
 
+  function handleMousedown(_e: MouseEvent) {
+    console.log("[bongo-nat] Browser mousedown detected");
+    onBonk();
+  }
+
+  function handleContextMenu(e: MouseEvent) {
+    e.preventDefault();
+  }
+
   function onBonk() {
     if (timeout) clearTimeout(timeout);
     isBonking = true;
@@ -56,9 +65,11 @@
       console.warn("[bongo-nat] Tauri API not available, using browser fallback", e);
     }
 
-    // Also listen for native browser keydown as a fallback / debug aid
+    // Also listen for native browser keydown/mousedown as a fallback / debug aid
     window.addEventListener("keydown", handleKeydown);
-    console.log("[bongo-nat] Browser keydown listener registered");
+    window.addEventListener("mousedown", handleMousedown);
+    window.addEventListener("contextmenu", handleContextMenu);
+    console.log("[bongo-nat] Browser keydown/mousedown listeners registered");
 
     // Track hover via pointermove – more reliable than enter/leave on transparent windows
     document.addEventListener("pointermove", handlePointerMove);
@@ -96,6 +107,8 @@
     if (hoverTimeout) clearTimeout(hoverTimeout);
     if (typeof window !== "undefined") {
       window.removeEventListener("keydown", handleKeydown);
+      window.removeEventListener("mousedown", handleMousedown);
+      window.removeEventListener("contextmenu", handleContextMenu);
       document.removeEventListener("pointermove", handlePointerMove);
       document.removeEventListener("mouseleave", handleDocMouseLeave);
     }

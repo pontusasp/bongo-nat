@@ -29,9 +29,16 @@ pub fn run() {
             std::thread::spawn(move || {
                 println!("[bongo-nat] Listener thread spawned");
                 if let Err(e) = rdev::listen(move |event| {
-                    if let rdev::EventType::KeyPress(key) = event.event_type {
-                        println!("[bongo-nat] Key pressed: {:?}", key);
-                        let _ = app_handle.emit("keypress", ());
+                    match event.event_type {
+                        rdev::EventType::KeyPress(key) => {
+                            println!("[bongo-nat] Key pressed: {:?}", key);
+                            let _ = app_handle.emit("keypress", ());
+                        }
+                        rdev::EventType::ButtonPress(button) => {
+                            println!("[bongo-nat] Mouse button pressed: {:?}", button);
+                            let _ = app_handle.emit("keypress", ());
+                        }
+                        _ => {}
                     }
                 }) {
                     eprintln!("[bongo-nat] ERROR: Could not start global keyboard listener: {:?}", e);

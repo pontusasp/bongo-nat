@@ -159,7 +159,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0);
+    background: rgba(0, 0, 0, 1);
+    box-sizing: border-box;
+    border: 5px solid green;
     border-radius: 20px;
     cursor: grab;
   }
@@ -182,7 +184,7 @@
 
   .bonk-tooltip {
     position: absolute;
-    bottom: 8px;
+    bottom: -8px;
     left: 50%;
     transform: translateX(-50%) translateY(-100%);
     background: rgba(30, 30, 30, 0.9);

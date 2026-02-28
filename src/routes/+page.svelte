@@ -56,21 +56,25 @@
     loadBonkCount();
 
     // Try Tauri event listener (works inside Tauri webview)
+    let hasTauri = false;
     try {
       unlisten = await listen("keypress", () => {
         console.log("[bongo-nat] Tauri keypress event received!");
         onBonk();
       });
+      hasTauri = true;
       console.log("[bongo-nat] Tauri event listener registered");
     } catch (e) {
       console.warn("[bongo-nat] Tauri API not available, using browser fallback", e);
     }
 
-    // Also listen for native browser keydown/mousedown as a fallback / debug aid
-    window.addEventListener("keydown", handleKeydown);
-    window.addEventListener("mousedown", handleMousedown);
+    // Only use browser listeners as fallback when Tauri is not available
+    if (!hasTauri) {
+      window.addEventListener("keydown", handleKeydown);
+      window.addEventListener("mousedown", handleMousedown);
+      console.log("[bongo-nat] Browser keydown/mousedown listeners registered");
+    }
     window.addEventListener("contextmenu", handleContextMenu);
-    console.log("[bongo-nat] Browser keydown/mousedown listeners registered");
 
     // Track hover via pointermove – more reliable than enter/leave on transparent windows
     document.addEventListener("pointermove", handlePointerMove);
@@ -88,7 +92,7 @@
 
     isHovering = over;
 
-    // Safety: auto-hide after 300ms of no pointer movement
+    // Safety: auto-hide after 2s of no pointer movement
     if (hoverTimeout) clearTimeout(hoverTimeout);
     if (over) {
       hoverTimeout = setTimeout(() => {

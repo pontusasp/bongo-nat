@@ -161,8 +161,9 @@
     justify-content: center;
     background: rgba(0, 0, 0, 1);
     box-sizing: border-box;
-    border: 5px solid green;
-    border-radius: 20px;
+    border: 7px solid #0b0;
+    border-radius: 100%;
+    padding: 30px;
     cursor: grab;
   }
 
@@ -184,11 +185,11 @@
 
   .bonk-tooltip {
     position: absolute;
-    bottom: -8px;
+    bottom: -14px;
     left: 50%;
     transform: translateX(-50%) translateY(-100%);
-    background: rgba(30, 30, 30, 0.9);
-    color: #fff;
+    background: rgba(255, 255, 255, 0.9);
+    color: #000;
     font-family: system-ui, -apple-system, sans-serif;
     font-size: 13px;
     font-weight: 600;

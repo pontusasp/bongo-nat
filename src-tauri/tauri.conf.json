@@ -14,8 +14,8 @@
       {
         "label": "main",
         "title": "Bongo Nat",
-        "width": 300,
-        "height": 300,
+        "width": 350,
+        "height": 350,
         "resizable": false,
         "decorations": false,
         "transparent": true,

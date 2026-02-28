@@ -5,10 +5,12 @@
   let isBonking = $state(false);
   let bonkCount = $state(0);
   let isHovering = $state(false);
+  let showBackground = $state(true);
   let timeout: ReturnType<typeof setTimeout> | null = null;
   let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
   let wrapperEl: HTMLDivElement | undefined = $state();
   let unlisten: UnlistenFn | null = null;
+  let unlistenBg: UnlistenFn | null = null;
 
   const BONK_DURATION_MS = 150;
   const BONK_COUNT_KEY = "bongo-nat-bonk-count";
@@ -74,6 +76,15 @@
       window.addEventListener("mousedown", handleMousedown);
       console.log("[bongo-nat] Browser keydown/mousedown listeners registered");
     }
+    // Listen for background toggle from tray menu
+    try {
+      unlistenBg = await listen("toggle-background", () => {
+        showBackground = !showBackground;
+      });
+    } catch (e) {
+      console.warn("[bongo-nat] Could not register toggle-background listener", e);
+    }
+
     window.addEventListener("contextmenu", handleContextMenu);
 
     // Track hover via pointermove – more reliable than enter/leave on transparent windows
@@ -108,6 +119,7 @@
 
   onDestroy(() => {
     if (unlisten) unlisten();
+    if (unlistenBg) unlistenBg();
     if (timeout) clearTimeout(timeout);
     if (hoverTimeout) clearTimeout(hoverTimeout);
     if (typeof window !== "undefined") {
@@ -120,7 +132,7 @@
   });
 </script>
 
-<div class="nat-container" data-tauri-drag-region>
+<div class="nat-container" class:no-bg={!showBackground} data-tauri-drag-region>
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="nat-wrapper"
@@ -204,5 +216,10 @@
 
   .bonk-tooltip.visible {
     opacity: 1;
+  }
+
+  .nat-container.no-bg {
+    background: transparent;
+    border-color: transparent;
   }
 </style>

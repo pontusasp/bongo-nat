@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::sync::Mutex;
 
-use tauri::menu::{Menu, MenuItem};
+use tauri::menu::{CheckMenuItem, Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::Emitter;
 
@@ -11,8 +11,9 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             // --- System Tray ---
+            let show_bg = CheckMenuItem::with_id(app, "show_bg", "Show Background", true, true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&quit])?;
+            let menu = Menu::with_items(app, &[&show_bg, &quit])?;
 
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
@@ -22,6 +23,8 @@ pub fn run() {
                 .on_menu_event(|app, event| {
                     if event.id().as_ref() == "quit" {
                         app.exit(0);
+                    } else if event.id().as_ref() == "show_bg" {
+                        let _ = app.emit("toggle-background", ());
                     }
                 })
                 .build(app)?;

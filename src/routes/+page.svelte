@@ -155,6 +155,12 @@
 </div>
 
 <style>
+  :global(*) {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    outline: none;
+  }
+
   :global(html),
   :global(body) {
     margin: 0;
@@ -193,6 +199,9 @@
     height: 280px;
     pointer-events: none;
     image-rendering: auto;
+    -webkit-user-drag: none;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   .bonk-tooltip {

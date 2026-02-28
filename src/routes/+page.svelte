@@ -124,7 +124,11 @@
     bind:this={wrapperEl}
   >
     {#if isBonking}
-      <img src="/nat-bonk.svg" alt="Nat bonking!" class="nat-image" draggable="false" />
+      {#if bonkCount % 2 === 0}
+        <img src="/nat-bonk-left.svg" alt="Nat bonking left!" class="nat-image" draggable="false" />
+      {:else}
+        <img src="/nat-bonk-right.svg" alt="Nat bonking right!" class="nat-image" draggable="false" />
+      {/if}
     {:else}
       <img src="/nat-idle.svg" alt="Nat idle" class="nat-image" draggable="false" />
     {/if}

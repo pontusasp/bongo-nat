@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="280" height="280" viewBox="0 0 280 280">
+  <!-- Body -->
+  <ellipse cx="140" cy="200" rx="100" ry="70" fill="#f5e6ca" stroke="#4a3728" stroke-width="3"/>
+  <!-- Head (slightly tilted/bounced) -->
+  <circle cx="140" cy="105" r="65" fill="#f5e6ca" stroke="#4a3728" stroke-width="3"/>
+  <!-- Left ear -->
+  <polygon points="88,55 70,10 108,40" fill="#f5e6ca" stroke="#4a3728" stroke-width="3"/>
+  <polygon points="90,50 78,20 105,42" fill="#f0c0a0" stroke="none"/>
+  <!-- Right ear -->
+  <polygon points="192,55 210,10 172,40" fill="#f5e6ca" stroke="#4a3728" stroke-width="3"/>
+  <polygon points="190,50 202,20 175,42" fill="#f0c0a0" stroke="none"/>
+  <!-- Left eye (squished/happy) -->
+  <path d="M103,100 Q115,90 127,100" fill="none" stroke="#4a3728" stroke-width="3" stroke-linecap="round"/>
+  <!-- Right eye (squished/happy) -->
+  <path d="M153,100 Q165,90 177,100" fill="none" stroke="#4a3728" stroke-width="3" stroke-linecap="round"/>
+  <!-- Nose -->
+  <ellipse cx="140" cy="120" rx="5" ry="3.5" fill="#f0a0a0"/>
+  <!-- Mouth (open/excited) -->
+  <ellipse cx="140" cy="132" rx="10" ry="7" fill="#4a3728"/>
+  <ellipse cx="140" cy="130" rx="7" ry="4" fill="#e06070"/>
+  <!-- Whiskers -->
+  <line x1="65" y1="112" x2="106" y2="117" stroke="#4a3728" stroke-width="1.5"/>
+  <line x1="65" y1="125" x2="106" y2="123" stroke="#4a3728" stroke-width="1.5"/>
+  <line x1="174" y1="117" x2="215" y2="112" stroke="#4a3728" stroke-width="1.5"/>
+  <line x1="174" y1="123" x2="215" y2="125" stroke="#4a3728" stroke-width="1.5"/>
+  <!-- Left paw (BONKING - raised up) -->
+  <ellipse cx="75" cy="230" rx="25" ry="12" fill="#f5e6ca" stroke="#4a3728" stroke-width="2" transform="rotate(-20, 75, 230)"/>
+  <!-- Left arm reaching down -->
+  <path d="M80,180 Q60,220 75,240" fill="none" stroke="#4a3728" stroke-width="3" stroke-linecap="round"/>
+  <!-- Right paw (BONKING - raised up) -->
+  <ellipse cx="205" cy="230" rx="25" ry="12" fill="#f5e6ca" stroke="#4a3728" stroke-width="2" transform="rotate(20, 205, 230)"/>
+  <!-- Right arm reaching down -->
+  <path d="M200,180 Q220,220 205,240" fill="none" stroke="#4a3728" stroke-width="3" stroke-linecap="round"/>
+  <!-- Impact lines -->
+  <line x1="55" y1="248" x2="45" y2="255" stroke="#4a3728" stroke-width="2" stroke-linecap="round"/>
+  <line x1="65" y1="252" x2="60" y2="262" stroke="#4a3728" stroke-width="2" stroke-linecap="round"/>
+  <line x1="225" y1="248" x2="235" y2="255" stroke="#4a3728" stroke-width="2" stroke-linecap="round"/>
+  <line x1="215" y1="252" x2="220" y2="262" stroke="#4a3728" stroke-width="2" stroke-linecap="round"/>
+  <!-- Surface line -->
+  <line x1="40" y1="270" x2="240" y2="270" stroke="#4a3728" stroke-width="2"/>
+</svg>

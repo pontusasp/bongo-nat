@@ -1,6 +1,12 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+  import { invoke } from "@tauri-apps/api/core";
+
+  interface BongoVersion {
+    name: string;
+    path: string | null;
+  }
 
   let isBonking = $state(false);
   let bonkCount = $state(0);
@@ -11,9 +17,47 @@
   let wrapperEl: HTMLDivElement | undefined = $state();
   let unlisten: UnlistenFn | null = null;
   let unlistenBg: UnlistenFn | null = null;
+  let unlistenVersion: UnlistenFn | null = null;
+
+  // --- Image URLs (reactive) ---
+  const DEFAULT_IDLE = "/bongo-nat-idle.png";
+  const DEFAULT_LEFT = "/bongo-nat-left.png";
+  const DEFAULT_RIGHT = "/bongo-nat-right.png";
+
+  let imgIdle = $state(DEFAULT_IDLE);
+  let imgLeft = $state(DEFAULT_LEFT);
+  let imgRight = $state(DEFAULT_RIGHT);
 
   const BONK_DURATION_MS = 150;
   const BONK_COUNT_KEY = "bongo-nat-bonk-count";
+
+  // --- Version loading ---
+  async function loadVersionImages(version: BongoVersion) {
+    if (!version.path) {
+      // Built-in default
+      imgIdle = DEFAULT_IDLE;
+      imgLeft = DEFAULT_LEFT;
+      imgRight = DEFAULT_RIGHT;
+      return;
+    }
+
+    try {
+      const [idle, left, right] = await Promise.all([
+        invoke<string>("get_version_image", { versionName: version.name, imageName: "idle" }),
+        invoke<string>("get_version_image", { versionName: version.name, imageName: "left" }),
+        invoke<string>("get_version_image", { versionName: version.name, imageName: "right" }),
+      ]);
+      imgIdle = idle;
+      imgLeft = left;
+      imgRight = right;
+      console.log(`[bongo-nat] Loaded images for version: ${version.name}`);
+    } catch (e) {
+      console.error("[bongo-nat] Failed to load version images, using defaults", e);
+      imgIdle = DEFAULT_IDLE;
+      imgLeft = DEFAULT_LEFT;
+      imgRight = DEFAULT_RIGHT;
+    }
+  }
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.repeat) return;
@@ -57,6 +101,15 @@
     console.log("[bongo-nat] Frontend mounted");
     loadBonkCount();
 
+    // Load persisted bongo version
+    try {
+      const current = await invoke<BongoVersion>("get_current_version");
+      console.log("[bongo-nat] Current version:", current.name);
+      await loadVersionImages(current);
+    } catch (e) {
+      console.warn("[bongo-nat] Could not load current version", e);
+    }
+
     // Try Tauri event listener (works inside Tauri webview)
     let hasTauri = false;
     try {
@@ -83,6 +136,16 @@
       });
     } catch (e) {
       console.warn("[bongo-nat] Could not register toggle-background listener", e);
+    }
+
+    // Listen for version changes from tray menu
+    try {
+      unlistenVersion = await listen<BongoVersion>("version-changed", (event) => {
+        console.log("[bongo-nat] Version changed to:", event.payload.name);
+        loadVersionImages(event.payload);
+      });
+    } catch (e) {
+      console.warn("[bongo-nat] Could not register version-changed listener", e);
     }
 
     window.addEventListener("contextmenu", handleContextMenu);
@@ -120,6 +183,7 @@
   onDestroy(() => {
     if (unlisten) unlisten();
     if (unlistenBg) unlistenBg();
+    if (unlistenVersion) unlistenVersion();
     if (timeout) clearTimeout(timeout);
     if (hoverTimeout) clearTimeout(hoverTimeout);
     if (typeof window !== "undefined") {
@@ -141,12 +205,12 @@
   >
     {#if isBonking}
       {#if bonkCount % 2 === 0}
-        <img src="/bongo-nat-left.png" alt="Nat bonking left!" class="nat-image" draggable="false" />
+        <img src={imgLeft} alt="Nat bonking left!" class="nat-image" draggable="false" />
       {:else}
-        <img src="/bongo-nat-right.png" alt="Nat bonking right!" class="nat-image" draggable="false" />
+        <img src={imgRight} alt="Nat bonking right!" class="nat-image" draggable="false" />
       {/if}
     {:else}
-      <img src="/bongo-nat-idle.png" alt="Nat idle" class="nat-image" draggable="false" />
+      <img src={imgIdle} alt="Nat idle" class="nat-image" draggable="false" />
     {/if}
     <div class="bonk-tooltip" class:visible={isHovering}>
       {bonkCount.toLocaleString()}

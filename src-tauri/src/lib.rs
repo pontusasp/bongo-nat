@@ -46,6 +46,30 @@ fn versions_dir(app: &AppHandle) -> PathBuf {
         .join(VERSIONS_DIR_NAME);
     if !dir.exists() {
         let _ = fs::create_dir_all(&dir);
+        // Write a helpful instructions file on first creation
+        let instructions = "\
+How to add a custom Bongo Cat version
+======================================
+
+1. Create a new folder inside this directory.
+   The folder name will appear in the tray menu
+   (e.g. \"My Cool Cat\").
+
+2. Place exactly three PNG images in that folder:
+     - idle.png   (the resting pose)
+     - left.png   (left-paw bonk)
+     - right.png  (right-paw bonk)
+
+3. Restart Bongo Nat.
+
+4. Right-click the tray icon and open the
+   \"Bongo Version\" submenu to select your new version.
+
+Note: Changes to this folder are only picked up when
+the application starts. Please restart Bongo Nat after
+adding, removing, or renaming version folders.
+";
+        let _ = fs::write(dir.join("instructions.txt"), instructions);
     }
     dir
 }

@@ -141,12 +141,12 @@
   >
     {#if isBonking}
       {#if bonkCount % 2 === 0}
-        <img src="/nat-bonk-left.svg" alt="Nat bonking left!" class="nat-image" draggable="false" />
+        <img src="/bongo-nat-left.png" alt="Nat bonking left!" class="nat-image" draggable="false" />
       {:else}
-        <img src="/nat-bonk-right.svg" alt="Nat bonking right!" class="nat-image" draggable="false" />
+        <img src="/bongo-nat-right.png" alt="Nat bonking right!" class="nat-image" draggable="false" />
       {/if}
     {:else}
-      <img src="/nat-idle.svg" alt="Nat idle" class="nat-image" draggable="false" />
+      <img src="/bongo-nat-idle.png" alt="Nat idle" class="nat-image" draggable="false" />
     {/if}
     <div class="bonk-tooltip" class:visible={isHovering}>
       {bonkCount.toLocaleString()}

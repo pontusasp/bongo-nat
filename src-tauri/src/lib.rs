@@ -11,10 +11,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             // --- System Tray ---
-            let credits = MenuItem::with_id(app, "credits", "Made by Epi", false, None::<&str>)?;
+            let github = MenuItem::with_id(app, "github", "Visit GitHub page", true, None::<&str>)?;
             let show_bg = CheckMenuItem::with_id(app, "show_bg", "Show Background", true, false, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_bg, &credits, &quit])?;
+            let menu = Menu::with_items(app, &[&show_bg, &github, &quit])?;
 
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
@@ -26,6 +26,8 @@ pub fn run() {
                         app.exit(0);
                     } else if event.id().as_ref() == "show_bg" {
                         let _ = app.emit("toggle-background", ());
+                    } else if event.id().as_ref() == "github" {
+                        let _ = tauri_plugin_opener::open_url("https://github.com/pontusasp/bongo-nat", None::<&str>);
                     }
                 })
                 .build(app)?;

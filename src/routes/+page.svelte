@@ -5,7 +5,7 @@
   let isBonking = $state(false);
   let bonkCount = $state(0);
   let isHovering = $state(false);
-  let showBackground = $state(true);
+  let showBackground = $state(false);
   let timeout: ReturnType<typeof setTimeout> | null = null;
   let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
   let wrapperEl: HTMLDivElement | undefined = $state();
@@ -195,8 +195,8 @@
   }
 
   .nat-image {
-    width: 280px;
-    height: 280px;
+    width: 100%;
+    height: 100%;
     pointer-events: none;
     image-rendering: auto;
     -webkit-user-drag: none;
@@ -206,7 +206,7 @@
 
   .bonk-tooltip {
     position: absolute;
-    bottom: -14px;
+    bottom: 3vh;
     left: 50%;
     transform: translateX(-50%) translateY(-100%);
     background: rgba(255, 255, 255, 0.9);

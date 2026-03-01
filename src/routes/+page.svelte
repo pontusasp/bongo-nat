@@ -101,6 +101,13 @@
     console.log("[bongo-nat] Frontend mounted");
     loadBonkCount();
 
+    // Load persisted background state
+    try {
+      showBackground = await invoke<boolean>("get_show_background");
+    } catch (e) {
+      console.warn("[bongo-nat] Could not load background state", e);
+    }
+
     // Load persisted bongo version
     try {
       const current = await invoke<BongoVersion>("get_current_version");
@@ -131,11 +138,11 @@
     }
     // Listen for background toggle from tray menu
     try {
-      unlistenBg = await listen("toggle-background", () => {
-        showBackground = !showBackground;
+      unlistenBg = await listen<boolean>("set-background", (event) => {
+        showBackground = event.payload;
       });
     } catch (e) {
-      console.warn("[bongo-nat] Could not register toggle-background listener", e);
+      console.warn("[bongo-nat] Could not register set-background listener", e);
     }
 
     // Listen for version changes from tray menu

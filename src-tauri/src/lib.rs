@@ -26,6 +26,9 @@ pub struct BongoVersion {
 struct Config {
     /// `None` means the built-in default.
     selected_version: Option<String>,
+    /// Whether the background circle is shown.
+    #[serde(default)]
+    show_background: bool,
 }
 
 const DEFAULT_VERSION_NAME: &str = "Bongo Nat (Default)";
@@ -171,6 +174,11 @@ fn get_versions_dir(app: AppHandle) -> String {
     versions_dir(&app).to_string_lossy().to_string()
 }
 
+#[tauri::command]
+fn get_show_background(app: AppHandle) -> bool {
+    load_config(&app).show_background
+}
+
 /// Read a version image and return it as a data: URL (base64-encoded PNG).
 /// `image_name` must be one of "idle", "left", "right".
 #[tauri::command]
@@ -226,6 +234,7 @@ pub fn run() {
             get_current_version,
             get_versions_dir,
             get_version_image,
+            get_show_background,
         ])
         .setup(|app| {
             // --- Ensure bongo-versions dir exists & scan ---
@@ -296,7 +305,7 @@ pub fn run() {
                 "show_bg",
                 "Show Background",
                 true,
-                false,
+                config.show_background,
                 None::<&str>,
             )?;
             let github =
@@ -319,7 +328,11 @@ pub fn run() {
                     if id == "quit" {
                         app.exit(0);
                     } else if id == "show_bg" {
-                        let _ = app.emit("toggle-background", ());
+                        // Persist the new background state
+                        let mut cfg = load_config(app);
+                        cfg.show_background = !cfg.show_background;
+                        save_config(app, &cfg);
+                        let _ = app.emit("set-background", cfg.show_background);
                     } else if id == "open_versions" {
                         let dir = versions_dir(app);
                         let _ = tauri_plugin_opener::open_path(
@@ -361,13 +374,12 @@ pub fn run() {
                                 })
                         };
 
-                        // 3. Save config
-                        let new_config = Config {
-                            selected_version: if selected.path.is_some() {
-                                Some(selected.name.clone())
-                            } else {
-                                None
-                            },
+                        // 3. Save config (preserve other fields)
+                        let mut new_config = load_config(app);
+                        new_config.selected_version = if selected.path.is_some() {
+                            Some(selected.name.clone())
+                        } else {
+                            None
                         };
                         save_config(app, &new_config);
 

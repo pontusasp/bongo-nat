@@ -11,9 +11,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             // --- System Tray ---
-            let show_bg = CheckMenuItem::with_id(app, "show_bg", "Show Background", true, true, None::<&str>)?;
+            let credits = MenuItem::with_id(app, "credits", "Made by Epi", false, None::<&str>)?;
+            let show_bg = CheckMenuItem::with_id(app, "show_bg", "Show Background", true, false, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_bg, &quit])?;
+            let menu = Menu::with_items(app, &[&show_bg, &credits, &quit])?;
 
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())

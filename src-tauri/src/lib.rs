@@ -177,6 +177,134 @@ fn save_config(app: &AppHandle, config: &Config) {
     }
 }
 
+fn sanitize_appimage_env(cmd: &mut std::process::Command) {
+    if std::env::var_os("APPIMAGE").is_some() || std::env::var_os("APPDIR").is_some() {
+        cmd.env_remove("LD_LIBRARY_PATH")
+            .env_remove("LD_PRELOAD")
+            .env_remove("QT_PLUGIN_PATH")
+            .env_remove("QML2_IMPORT_PATH")
+            .env_remove("GTK_PATH")
+            .env_remove("GTK_EXE_PREFIX")
+            .env_remove("GTK_DATA_PREFIX")
+            .env_remove("GDK_PIXBUF_MODULEDIR")
+            .env_remove("GDK_PIXBUF_MODULE_FILE")
+            .env_remove("GI_TYPELIB_PATH")
+            .env_remove("GSETTINGS_SCHEMA_DIR")
+            .env_remove("XDG_DATA_DIRS");
+        if let Ok(orig_path) = std::env::var("OWD") {
+            let _ = cmd.current_dir(orig_path);
+        }
+    }
+}
+
+/// Open a directory or URL on the host system.
+/// On Linux, tries `org.freedesktop.FileManager1.ShowFolders` over D-Bus first for local
+/// directories (which instructs the running desktop file manager like Dolphin/Nautilus to
+/// open the folder directly in the host session without inheriting any AppImage libraries),
+/// then falls back to `xdg-open` / `gio open` with sanitized environment variables.
+fn open_external(target: &str) {
+    #[cfg(target_os = "linux")]
+    {
+        let is_url = target.starts_with("http://") || target.starts_with("https://");
+        if !is_url {
+            let file_uri = format!("file://{target}");
+            let mut dbus_cmd = std::process::Command::new("gdbus");
+            dbus_cmd.args([
+                "call",
+                "--session",
+                "--dest",
+                "org.freedesktop.FileManager1",
+                "--object-path",
+                "/org/freedesktop/FileManager1",
+                "--method",
+                "org.freedesktop.FileManager1.ShowFolders",
+                &format!("['{file_uri}']"),
+                "",
+            ]);
+            sanitize_appimage_env(&mut dbus_cmd);
+            if let Ok(status) = dbus_cmd.status() {
+                if status.success() {
+                    return;
+                }
+            }
+        }
+
+        let mut cmd = std::process::Command::new("xdg-open");
+        cmd.arg(target);
+        sanitize_appimage_env(&mut cmd);
+        match cmd.spawn() {
+            Ok(_) => return,
+            Err(e) => eprintln!("[bongo-nat] Failed to spawn xdg-open for {target}: {e}"),
+        }
+    }
+    if let Err(e) = tauri_plugin_opener::open_path(target, None::<&str>) {
+        let _ = tauri_plugin_opener::open_url(target, None::<&str>);
+        eprintln!("[bongo-nat] Fallback opener error for {target}: {e}");
+    }
+}
+
+fn copy_to_clipboard(text: &str) {
+    #[cfg(target_os = "linux")]
+    {
+        use std::io::Write;
+        for (bin, args) in [
+            ("wl-copy", &[][..]),
+            ("xclip", &["-selection", "clipboard"][..]),
+            ("xsel", &["--clipboard", "--input"][..]),
+        ] {
+            let mut cmd = std::process::Command::new(bin);
+            cmd.args(args)
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null());
+            sanitize_appimage_env(&mut cmd);
+            if let Ok(mut child) = cmd.spawn() {
+                if let Some(mut stdin) = child.stdin.take() {
+                    let _ = stdin.write_all(text.as_bytes());
+                }
+                return;
+            }
+        }
+    }
+}
+
+fn show_paths_dialog(app: &AppHandle) {
+    let v_dir = versions_dir(app).to_string_lossy().to_string();
+    let c_path = config_path(app).to_string_lossy().to_string();
+    let _ = app.emit(
+        "show-paths",
+        serde_json::json!({
+            "versionsDir": v_dir,
+            "configPath": c_path,
+        }),
+    );
+
+    #[cfg(target_os = "linux")]
+    {
+        let msg = format!("Versions Folder:\n{v_dir}\n\nConfig File:\n{c_path}");
+        // Try kdialog, zenity, or notify-send so the user gets a native window/notification
+        // even if the Bongo Nat overlay window is tiny (e.g. 10% scale).
+        for (bin, args) in [
+            (
+                "kdialog",
+                vec!["--title", "Bongo Nat Paths", "--msgbox", &msg],
+            ),
+            (
+                "zenity",
+                vec!["--info", "--title=Bongo Nat Paths", "--text", &msg],
+            ),
+            ("notify-send", vec!["Bongo Nat Paths", &msg]),
+        ] {
+            let mut cmd = std::process::Command::new(bin);
+            cmd.args(&args);
+            sanitize_appimage_env(&mut cmd);
+            if cmd.spawn().is_ok() {
+                break;
+            }
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers – resolve the active BongoVersion
 // ---------------------------------------------------------------------------
@@ -237,8 +365,7 @@ fn get_version_image(
 ) -> Result<String, String> {
     let dir = versions_dir(&app);
     let path = dir.join(&version_name).join(format!("{image_name}.png"));
-    let data =
-        fs::read(&path).map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+    let data = fs::read(&path).map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
 
     let b64 = base64_encode(&data);
     Ok(format!("data:image/png;base64,{b64}"))
@@ -292,10 +419,7 @@ pub fn run() {
             let config = load_config(&app.handle());
             let current = resolve_current_version(&config, &versions);
 
-            println!(
-                "[bongo-nat] Versions dir: {}",
-                vdir.display()
-            );
+            println!("[bongo-nat] Versions dir: {}", vdir.display());
             println!(
                 "[bongo-nat] Found {} custom version(s), selected: {}",
                 versions.len(),
@@ -309,8 +433,7 @@ pub fn run() {
             apply_window_scale(&app.handle(), config.scale_percent);
 
             // --- Build version CheckMenuItems ---
-            let default_checked =
-                current.name == DEFAULT_VERSION_NAME || current.path.is_none();
+            let default_checked = current.name == DEFAULT_VERSION_NAME || current.path.is_none();
             let default_item = CheckMenuItem::with_id(
                 app,
                 "version:__default__",
@@ -320,8 +443,7 @@ pub fn run() {
                 None::<&str>,
             )?;
 
-            let mut version_checks: Vec<CheckMenuItem<tauri::Wry>> =
-                vec![default_item.clone()];
+            let mut version_checks: Vec<CheckMenuItem<tauri::Wry>> = vec![default_item.clone()];
 
             for v in &versions {
                 let checked = v.name == current.name && current.path.is_some();
@@ -337,8 +459,10 @@ pub fn run() {
             }
 
             // Build submenu from references
-            let sub_refs: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> =
-                version_checks.iter().map(|c| c as &dyn tauri::menu::IsMenuItem<tauri::Wry>).collect();
+            let sub_refs: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = version_checks
+                .iter()
+                .map(|c| c as &dyn tauri::menu::IsMenuItem<tauri::Wry>)
+                .collect();
             let version_submenu = Submenu::with_id_and_items(
                 app,
                 "versions_submenu",
@@ -370,15 +494,12 @@ pub fn run() {
                 .iter()
                 .map(|c| c as &dyn tauri::menu::IsMenuItem<tauri::Wry>)
                 .collect();
-            let scale_submenu = Submenu::with_id_and_items(
-                app,
-                "scale_submenu",
-                "Size",
-                true,
-                &scale_refs,
-            )?;
+            let scale_submenu =
+                Submenu::with_id_and_items(app, "scale_submenu", "Size", true, &scale_refs)?;
 
-            // --- Other tray items ---
+            // --- Build Paths / Info submenu ---
+            let vdir_str = vdir.to_string_lossy().to_string();
+            let cpath_str = config_path(&app.handle()).to_string_lossy().to_string();
             let open_versions = MenuItem::with_id(
                 app,
                 "open_versions",
@@ -386,6 +507,52 @@ pub fn run() {
                 true,
                 None::<&str>,
             )?;
+            let show_paths_item =
+                MenuItem::with_id(app, "show_paths", "Show Paths Popup", true, None::<&str>)?;
+            let copy_versions_path = MenuItem::with_id(
+                app,
+                "copy_versions_path",
+                "Copy Versions Folder Path",
+                true,
+                None::<&str>,
+            )?;
+            let copy_config_path = MenuItem::with_id(
+                app,
+                "copy_config_path",
+                "Copy Config File Path",
+                true,
+                None::<&str>,
+            )?;
+            let info_versions_path = MenuItem::with_id(
+                app,
+                "info_versions_path",
+                format!("Versions: {vdir_str}"),
+                false,
+                None::<&str>,
+            )?;
+            let info_config_path = MenuItem::with_id(
+                app,
+                "info_config_path",
+                format!("Config: {cpath_str}"),
+                false,
+                None::<&str>,
+            )?;
+            let paths_submenu = Submenu::with_id_and_items(
+                app,
+                "paths_submenu",
+                "Config locations",
+                true,
+                &[
+                    &open_versions,
+                    &show_paths_item,
+                    &copy_versions_path,
+                    &copy_config_path,
+                    &info_versions_path,
+                    &info_config_path,
+                ],
+            )?;
+
+            // --- Other tray items ---
             let show_bg = CheckMenuItem::with_id(
                 app,
                 "show_bg",
@@ -402,14 +569,13 @@ pub fn run() {
                 config.always_on_top,
                 None::<&str>,
             )?;
-            let github =
-                MenuItem::with_id(app, "github", "Visit GitHub page", true, None::<&str>)?;
+            let github = MenuItem::with_id(app, "github", "Visit GitHub page", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(
                 app,
                 &[
                     &version_submenu,
-                    &open_versions,
+                    &paths_submenu,
                     &scale_submenu,
                     &show_bg,
                     &always_on_top,
@@ -460,15 +626,17 @@ pub fn run() {
                         }
                     } else if id == "open_versions" {
                         let dir = versions_dir(app);
-                        let _ = tauri_plugin_opener::open_path(
-                            &dir,
-                            None::<&str>,
-                        );
+                        open_external(&dir.to_string_lossy());
+                    } else if id == "show_paths" {
+                        show_paths_dialog(app);
+                    } else if id == "copy_versions_path" {
+                        let dir = versions_dir(app);
+                        copy_to_clipboard(&dir.to_string_lossy());
+                    } else if id == "copy_config_path" {
+                        let path = config_path(app);
+                        copy_to_clipboard(&path.to_string_lossy());
                     } else if id == "github" {
-                        let _ = tauri_plugin_opener::open_url(
-                            "https://github.com/pontusasp/bongo-nat",
-                            None::<&str>,
-                        );
+                        open_external("https://github.com/pontusasp/bongo-nat");
                     } else if id.starts_with("version:") {
                         // --- Handle version selection ---
                         // 1. Toggle checks: only the selected item should be checked
@@ -522,28 +690,26 @@ pub fn run() {
                 println!("[bongo-nat] Listener thread spawned");
                 let held_keys: Mutex<HashSet<rdev::Key>> = Mutex::new(HashSet::new());
                 let held_buttons: Mutex<HashSet<rdev::Button>> = Mutex::new(HashSet::new());
-                if let Err(e) = rdev::listen(move |event| {
-                    match event.event_type {
-                        rdev::EventType::KeyPress(key) => {
-                            let mut keys = held_keys.lock().unwrap();
-                            if keys.insert(key) {
-                                let _ = app_handle.emit("keypress", ());
-                            }
+                if let Err(e) = rdev::listen(move |event| match event.event_type {
+                    rdev::EventType::KeyPress(key) => {
+                        let mut keys = held_keys.lock().unwrap();
+                        if keys.insert(key) {
+                            let _ = app_handle.emit("keypress", ());
                         }
-                        rdev::EventType::KeyRelease(key) => {
-                            held_keys.lock().unwrap().remove(&key);
-                        }
-                        rdev::EventType::ButtonPress(button) => {
-                            let mut buttons = held_buttons.lock().unwrap();
-                            if buttons.insert(button) {
-                                let _ = app_handle.emit("keypress", ());
-                            }
-                        }
-                        rdev::EventType::ButtonRelease(button) => {
-                            held_buttons.lock().unwrap().remove(&button);
-                        }
-                        _ => {}
                     }
+                    rdev::EventType::KeyRelease(key) => {
+                        held_keys.lock().unwrap().remove(&key);
+                    }
+                    rdev::EventType::ButtonPress(button) => {
+                        let mut buttons = held_buttons.lock().unwrap();
+                        if buttons.insert(button) {
+                            let _ = app_handle.emit("keypress", ());
+                        }
+                    }
+                    rdev::EventType::ButtonRelease(button) => {
+                        held_buttons.lock().unwrap().remove(&button);
+                    }
+                    _ => {}
                 }) {
                     eprintln!(
                         "[bongo-nat] ERROR: Could not start global keyboard listener: {:?}",

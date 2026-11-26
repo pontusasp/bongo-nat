@@ -14,7 +14,7 @@ Built with [Tauri](https://tauri.app/), [SvelteKit](https://kit.svelte.dev/) and
 - **Custom bongo versions** — drop your own sprite sets into the `bongo-versions` folder and switch between them from the tray menu. Each version is a folder containing `idle.png`, `left.png` and `right.png`.
 - **System tray integration** — all options are accessible by right-clicking the tray icon:
   - **Bongo Version** — switch between the built-in default and any custom versions you've added.
-  - **Open Versions Folder** — opens the directory where you can add new bongo versions.
+  - **Paths & Files** — submenu to open the versions folder, show a native popup dialog with full file paths, copy the versions/config paths to your clipboard, or view the paths directly in the menu.
   - **Size** — scale the window size between 10%, 25%, 50%, 75%, 100% (Default), 125%, 150%, 200%, 250%, and 300%.
   - **Show Background** — toggles a circular background behind nat.
   - **Always on Top** — toggles whether the window stays on top of all other windows.

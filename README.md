@@ -16,6 +16,7 @@ Built with [Tauri](https://tauri.app/), [SvelteKit](https://kit.svelte.dev/) and
   - **Bongo Version** — switch between the built-in default and any custom versions you've added.
   - **Open Versions Folder** — opens the directory where you can add new bongo versions.
   - **Show Background** — toggles a circular background behind nat.
+  - **Always on Top** — toggles whether the window stays on top of all other windows.
   - **Visit GitHub page** — opens the project repository in your browser.
   - **Quit** — exits the application.
 - **Cross-platform** — runs on Linux, Windows and macOS.

@@ -1,6 +1,6 @@
 {
   "name": "bongo-nat",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "",
   "type": "module",
   "scripts": {
@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "build:container": "CONTAINER_ENGINE=$(command -v podman || command -v docker) && $CONTAINER_ENGINE build -t tauri-builder . && $CONTAINER_ENGINE run --rm -v \"$(pwd):/app\" -v tauri-cargo-cache:/root/.cargo/registry -v tauri-target-cache:/app/src-tauri/target tauri-builder"
   },
   "license": "MIT",
   "dependencies": {

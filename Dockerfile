@@ -27,29 +27,31 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-# Install Tauri CLI
-RUN cargo install tauri-cli
+ENV APPIMAGE_EXTRACT_AND_RUN=1
 
-# Download and extract appimagetool as a native binary (no FUSE needed)
-RUN wget -O /tmp/appimagetool.AppImage \
-    "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" \
-    && chmod +x /tmp/appimagetool.AppImage \
-    && APPIMAGE_EXTRACT_AND_RUN=1 /tmp/appimagetool.AppImage --appimage-extract \
-    && mv squashfs-root /opt/appimagetool \
-    && rm /tmp/appimagetool.AppImage
+# Pre-populate /root/.cache/tauri with linuxdeploy tools so container runs don't re-download them
+RUN mkdir -p /root/.cache/tauri \
+    && wget -q -O /root/.cache/tauri/AppRun-x86_64 \
+      "https://github.com/tauri-apps/binary-releases/releases/download/apprun-old/AppRun-x86_64" \
+    && wget -q -O /root/.cache/tauri/linuxdeploy-x86_64.AppImage \
+      "https://github.com/tauri-apps/binary-releases/releases/download/linuxdeploy-07333c6/linuxdeploy-x86_64.AppImage" \
+    && wget -q -O /root/.cache/tauri/linuxdeploy-plugin-appimage.AppImage \
+      "https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-x86_64.AppImage" \
+    && chmod +x /root/.cache/tauri/AppRun-x86_64 \
+      /root/.cache/tauri/linuxdeploy-x86_64.AppImage \
+      /root/.cache/tauri/linuxdeploy-plugin-appimage.AppImage
 
 WORKDIR /app
 
-# $ docker build -t tauri-builder .
+# Default command builds the app and copies the bundled artifacts (.AppImage, .deb, .rpm) into /app/dist/
+CMD ["bash", "-c", "npm install && npm run tauri build && mkdir -p /app/dist && cp -f /app/src-tauri/target/release/bundle/appimage/*.AppImage /app/src-tauri/target/release/bundle/deb/*.deb /app/src-tauri/target/release/bundle/rpm/*.rpm /app/dist/ && ls -lh /app/dist/"]
+
+# Usage (works with podman or docker):
 #
-# $ docker run --rm \
+# $ podman build -t tauri-builder .
+#
+# $ podman run --rm \
 #   -v $(pwd):/app \
 #   -v tauri-cargo-cache:/root/.cargo/registry \
 #   -v tauri-target-cache:/app/src-tauri/target \
-#   -e APPIMAGE_EXTRACT_AND_RUN=1 \
-#   tauri-builder \
-#   bash -c "npm install && \
-#     cargo tauri build; \
-#     ARCH=x86_64 /opt/appimagetool/AppRun \
-#       '/app/src-tauri/target/release/bundle/appimage/Bongo Nat.AppDir' \
-#       '/app/src-tauri/target/release/bundle/appimage/Bongo Nat_X.Y.Z_amd64.AppImage'"
+#   tauri-builder

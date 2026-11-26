@@ -22,13 +22,30 @@ pub struct BongoVersion {
 }
 
 /// Persisted user config.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct Config {
     /// `None` means the built-in default.
     selected_version: Option<String>,
     /// Whether the background circle is shown.
     #[serde(default)]
     show_background: bool,
+    /// Whether the window is always displayed on top.
+    #[serde(default = "default_always_on_top")]
+    always_on_top: bool,
+}
+
+fn default_always_on_top() -> bool {
+    true
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            selected_version: None,
+            show_background: false,
+            always_on_top: true,
+        }
+    }
 }
 
 const DEFAULT_VERSION_NAME: &str = "Bongo Nat (Default)";
@@ -253,6 +270,11 @@ pub fn run() {
                 current.name
             );
 
+            // Apply persisted always_on_top setting to the main window
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_always_on_top(config.always_on_top);
+            }
+
             // --- Build version CheckMenuItems ---
             let default_checked =
                 current.name == DEFAULT_VERSION_NAME || current.path.is_none();
@@ -308,11 +330,28 @@ pub fn run() {
                 config.show_background,
                 None::<&str>,
             )?;
+            let always_on_top = CheckMenuItem::with_id(
+                app,
+                "always_on_top",
+                "Always on Top",
+                true,
+                config.always_on_top,
+                None::<&str>,
+            )?;
             let github =
                 MenuItem::with_id(app, "github", "Visit GitHub page", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu =
-                Menu::with_items(app, &[&version_submenu, &open_versions, &show_bg, &github, &quit])?;
+            let menu = Menu::with_items(
+                app,
+                &[
+                    &version_submenu,
+                    &open_versions,
+                    &show_bg,
+                    &always_on_top,
+                    &github,
+                    &quit,
+                ],
+            )?;
 
             // Clone the version check items for the closure (cheap Arc clone).
             let version_checks_for_closure = version_checks.clone();
@@ -333,6 +372,14 @@ pub fn run() {
                         cfg.show_background = !cfg.show_background;
                         save_config(app, &cfg);
                         let _ = app.emit("set-background", cfg.show_background);
+                    } else if id == "always_on_top" {
+                        // Persist the new always-on-top state and update the window
+                        let mut cfg = load_config(app);
+                        cfg.always_on_top = !cfg.always_on_top;
+                        save_config(app, &cfg);
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.set_always_on_top(cfg.always_on_top);
+                        }
                     } else if id == "open_versions" {
                         let dir = versions_dir(app);
                         let _ = tauri_plugin_opener::open_path(

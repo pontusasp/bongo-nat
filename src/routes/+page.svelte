@@ -12,12 +12,15 @@
   let bonkCount = $state(0);
   let isHovering = $state(false);
   let showBackground = $state(false);
+  let scalePercent = $state(100);
+  let isReady = $state(false);
   let timeout: ReturnType<typeof setTimeout> | null = null;
   let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
   let wrapperEl: HTMLDivElement | undefined = $state();
   let unlisten: UnlistenFn | null = null;
   let unlistenBg: UnlistenFn | null = null;
   let unlistenVersion: UnlistenFn | null = null;
+  let unlistenScale: UnlistenFn | null = null;
 
   // --- Image URLs (reactive) ---
   const DEFAULT_IDLE = "/bongo-nat-idle.png";
@@ -108,6 +111,13 @@
       console.warn("[bongo-nat] Could not load background state", e);
     }
 
+    // Load persisted scale percent
+    try {
+      scalePercent = await invoke<number>("get_scale_percent");
+    } catch (e) {
+      console.warn("[bongo-nat] Could not load scale percent", e);
+    }
+
     // Load persisted bongo version
     try {
       const current = await invoke<BongoVersion>("get_current_version");
@@ -116,6 +126,8 @@
     } catch (e) {
       console.warn("[bongo-nat] Could not load current version", e);
     }
+
+    isReady = true;
 
     // Try Tauri event listener (works inside Tauri webview)
     let hasTauri = false;
@@ -155,6 +167,15 @@
       console.warn("[bongo-nat] Could not register version-changed listener", e);
     }
 
+    // Listen for scale changes from tray menu
+    try {
+      unlistenScale = await listen<number>("scale-changed", (event) => {
+        scalePercent = event.payload;
+      });
+    } catch (e) {
+      console.warn("[bongo-nat] Could not register scale-changed listener", e);
+    }
+
     window.addEventListener("contextmenu", handleContextMenu);
 
     // Track hover via pointermove – more reliable than enter/leave on transparent windows
@@ -191,6 +212,7 @@
     if (unlisten) unlisten();
     if (unlistenBg) unlistenBg();
     if (unlistenVersion) unlistenVersion();
+    if (unlistenScale) unlistenScale();
     if (timeout) clearTimeout(timeout);
     if (hoverTimeout) clearTimeout(hoverTimeout);
     if (typeof window !== "undefined") {
@@ -203,27 +225,36 @@
   });
 </script>
 
-<div class="nat-container" class:no-bg={!showBackground} data-tauri-drag-region>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="nat-wrapper"
-    data-tauri-drag-region
-    bind:this={wrapperEl}
-  >
-    {#if isBonking}
-      {#if bonkCount % 2 === 0}
-        <img src={imgLeft} alt="Nat bonking left!" class="nat-image" draggable="false" />
-      {:else}
-        <img src={imgRight} alt="Nat bonking right!" class="nat-image" draggable="false" />
-      {/if}
-    {:else}
-      <img src={imgIdle} alt="Nat idle" class="nat-image" draggable="false" />
-    {/if}
-    <div class="bonk-tooltip" class:visible={isHovering}>
-      {bonkCount.toLocaleString()}
+{#if isReady}
+  <div class="viewport-center">
+    <div
+      class="nat-container"
+      class:no-bg={!showBackground}
+      style="--target-size: {300 * (scalePercent / 100)}px;"
+      data-tauri-drag-region
+    >
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div
+        class="nat-wrapper"
+        data-tauri-drag-region
+        bind:this={wrapperEl}
+      >
+        {#if isBonking}
+          {#if bonkCount % 2 === 0}
+            <img src={imgLeft} alt="Nat bonking left!" class="nat-image" draggable="false" />
+          {:else}
+            <img src={imgRight} alt="Nat bonking right!" class="nat-image" draggable="false" />
+          {/if}
+        {:else}
+          <img src={imgIdle} alt="Nat idle" class="nat-image" draggable="false" />
+        {/if}
+        <div class="bonk-tooltip" class:visible={isHovering}>
+          {bonkCount.toLocaleString()}
+        </div>
+      </div>
     </div>
   </div>
-</div>
+{/if}
 
 <style>
   :global(*) {
@@ -242,17 +273,26 @@
     -webkit-user-select: none;
   }
 
-  .nat-container {
+  .viewport-center {
     width: 100vw;
     height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .nat-container {
+    --size: min(100vw, 100vh, var(--target-size, 300px));
+    width: var(--size);
+    height: var(--size);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: rgba(0, 0, 0, 1);
     box-sizing: border-box;
-    border: 7px solid #0b0;
+    border: calc(var(--size) * 0.0233) solid #0b0;
     border-radius: 100%;
-    padding: 30px;
+    padding: calc(var(--size) * 0.1);
     cursor: grab;
   }
 
@@ -262,12 +302,17 @@
 
   .nat-wrapper {
     position: relative;
-    display: inline-block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
   }
 
   .nat-image {
     width: 100%;
     height: 100%;
+    object-fit: contain;
     pointer-events: none;
     image-rendering: auto;
     -webkit-user-drag: none;

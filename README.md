@@ -15,6 +15,7 @@ Built with [Tauri](https://tauri.app/), [SvelteKit](https://kit.svelte.dev/) and
 - **System tray integration** — all options are accessible by right-clicking the tray icon:
   - **Bongo Version** — switch between the built-in default and any custom versions you've added.
   - **Open Versions Folder** — opens the directory where you can add new bongo versions.
+  - **Size** — scale the window size between 10%, 25%, 50%, 75%, 100% (Default), 125%, 150%, 200%, 250%, and 300%.
   - **Show Background** — toggles a circular background behind nat.
   - **Always on Top** — toggles whether the window stays on top of all other windows.
   - **Visit GitHub page** — opens the project repository in your browser.

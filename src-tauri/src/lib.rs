@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, Submenu};
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, LogicalSize, Manager};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -32,10 +32,17 @@ struct Config {
     /// Whether the window is always displayed on top.
     #[serde(default = "default_always_on_top")]
     always_on_top: bool,
+    /// Window scale percentage (e.g. 50, 75, 100, 125, 150, 200).
+    #[serde(default = "default_scale_percent")]
+    scale_percent: u32,
 }
 
 fn default_always_on_top() -> bool {
     true
+}
+
+fn default_scale_percent() -> u32 {
+    100
 }
 
 impl Default for Config {
@@ -44,6 +51,7 @@ impl Default for Config {
             selected_version: None,
             show_background: false,
             always_on_top: true,
+            scale_percent: 100,
         }
     }
 }
@@ -51,6 +59,24 @@ impl Default for Config {
 const DEFAULT_VERSION_NAME: &str = "Bongo Nat (Default)";
 const VERSIONS_DIR_NAME: &str = "bongo-versions";
 const CONFIG_FILE_NAME: &str = "bongo-nat-config.json";
+const BASE_WINDOW_SIZE: f64 = 300.0;
+const SCALE_PRESETS: &[u32] = &[10, 25, 50, 75, 100, 125, 150, 200, 250, 300];
+
+fn apply_window_scale(app: &AppHandle, scale_percent: u32) {
+    if let Some(window) = app.get_webview_window("main") {
+        let size = BASE_WINDOW_SIZE * (scale_percent as f64 / 100.0);
+        let was_resizable = window.is_resizable().unwrap_or(false);
+        if !was_resizable {
+            let _ = window.set_resizable(true);
+        }
+        let _ = window.set_min_size(Some(LogicalSize::new(1.0, 1.0)));
+        let _ = window.set_size(LogicalSize::new(size, size));
+        if !was_resizable {
+            let _ = window.set_resizable(false);
+        }
+    }
+    let _ = app.emit("scale-changed", scale_percent);
+}
 
 // ---------------------------------------------------------------------------
 // Helpers – filesystem
@@ -196,6 +222,11 @@ fn get_show_background(app: AppHandle) -> bool {
     load_config(&app).show_background
 }
 
+#[tauri::command]
+fn get_scale_percent(app: AppHandle) -> u32 {
+    load_config(&app).scale_percent
+}
+
 /// Read a version image and return it as a data: URL (base64-encoded PNG).
 /// `image_name` must be one of "idle", "left", "right".
 #[tauri::command]
@@ -252,6 +283,7 @@ pub fn run() {
             get_versions_dir,
             get_version_image,
             get_show_background,
+            get_scale_percent,
         ])
         .setup(|app| {
             // --- Ensure bongo-versions dir exists & scan ---
@@ -270,10 +302,11 @@ pub fn run() {
                 current.name
             );
 
-            // Apply persisted always_on_top setting to the main window
+            // Apply persisted always_on_top and scale_percent settings to the main window
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_always_on_top(config.always_on_top);
             }
+            apply_window_scale(&app.handle(), config.scale_percent);
 
             // --- Build version CheckMenuItems ---
             let default_checked =
@@ -314,6 +347,37 @@ pub fn run() {
                 &sub_refs,
             )?;
 
+            // --- Build scale CheckMenuItems ---
+            let mut scale_checks: Vec<CheckMenuItem<tauri::Wry>> = Vec::new();
+            for &pct in SCALE_PRESETS {
+                let checked = config.scale_percent == pct;
+                let label = if pct == 100 {
+                    format!("{pct}% (Default)")
+                } else {
+                    format!("{pct}%")
+                };
+                let item = CheckMenuItem::with_id(
+                    app,
+                    format!("scale:{pct}"),
+                    label,
+                    true,
+                    checked,
+                    None::<&str>,
+                )?;
+                scale_checks.push(item);
+            }
+            let scale_refs: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = scale_checks
+                .iter()
+                .map(|c| c as &dyn tauri::menu::IsMenuItem<tauri::Wry>)
+                .collect();
+            let scale_submenu = Submenu::with_id_and_items(
+                app,
+                "scale_submenu",
+                "Size",
+                true,
+                &scale_refs,
+            )?;
+
             // --- Other tray items ---
             let open_versions = MenuItem::with_id(
                 app,
@@ -346,6 +410,7 @@ pub fn run() {
                 &[
                     &version_submenu,
                     &open_versions,
+                    &scale_submenu,
                     &show_bg,
                     &always_on_top,
                     &github,
@@ -353,8 +418,9 @@ pub fn run() {
                 ],
             )?;
 
-            // Clone the version check items for the closure (cheap Arc clone).
+            // Clone the check items for the closure (cheap Arc clone).
             let version_checks_for_closure = version_checks.clone();
+            let scale_checks_for_closure = scale_checks.clone();
 
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
@@ -379,6 +445,18 @@ pub fn run() {
                         save_config(app, &cfg);
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.set_always_on_top(cfg.always_on_top);
+                        }
+                    } else if id.starts_with("scale:") {
+                        if let Ok(pct) = id["scale:".len()..].parse::<u32>() {
+                            for check in &scale_checks_for_closure {
+                                let is_selected = check.id().as_ref() == id;
+                                let _ = check.set_checked(is_selected);
+                            }
+                            let mut cfg = load_config(app);
+                            cfg.scale_percent = pct;
+                            save_config(app, &cfg);
+                            apply_window_scale(app, pct);
+                            println!("[bongo-nat] Scale changed to: {pct}%");
                         }
                     } else if id == "open_versions" {
                         let dir = versions_dir(app);
